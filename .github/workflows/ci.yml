@@ -41,3 +41,4 @@ jobs:
         run: |
           docker tag flask-app $DOCKER_USERNAME/flask-app:latest
           docker push $DOCKER_USERNAME/flask-app:latest
+          
