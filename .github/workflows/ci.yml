@@ -12,53 +12,93 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # Étape 1: Checkout du code
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Étape 2: Affichage des versions Docker et Python pour débogage
-      - name: Show Docker version
-        run: docker --version
-
-      - name: Show Python version
-        run: python --version
-
-      # Étape 3: Configurer Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: '3.13'
 
-      # Étape 4: Installer les dépendances
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Étape 5: Exécuter les tests
       - name: Run tests
-        run: pytest --maxfail=5 --disable-warnings -v
-
-      # Étape 6: Pruning des images Docker inutilisées
-      - name: Prune unused Docker images
-        run: docker system prune -f
-
-      # Étape 7: Construction de l'image Docker
-      - name: Build Docker Image
         run: |
-          docker build -t flask-app .
-          docker images  # Affiche les images Docker après la construction
+          pytest  # Exécute tes tests unitaires ici
 
-      # Étape 8: Connexion à Docker Hub
+      - name: Build Docker image
+        run: |
+          docker build -t your-image-name .
+
       - name: Login to Docker Hub
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-          DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-        run: echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # Étape 9: Taguer et pousser l'image Docker vers Docker Hub
-      - name: Tag and Push Docker Image
+      - name: Push Docker image to Docker Hub
+        if: success()
         run: |
-          docker tag flask-app $DOCKER_USERNAME/flask-app:latest
-          docker push $DOCKER_USERNAME/flask-app:latest
+          docker push your-image-name
 
+  tests:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: |
+          pytest  # Exécute les tests unitaires ici
+
+  push_multiple_registries:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Login to Private Docker Registry
+        run: |
+          docker login private-registry.com -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push your-image-name
+
+      - name: Push Docker image to Private Registry
+        run: |
+          docker push private-registry.com/your-image-name
+
+  notify_failure:
+    runs-on: ubuntu-latest
+    if: failure()
+    steps:
+      - name: Send failure email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.example.com  # Remplace par ton serveur SMTP
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          subject: "GitHub Actions Failure"
+          to: "fatmaezzahra.messaoudi@gmail"  # Remplace par ton adresse email
+          from: "fatmaezzahra.messaoudi@gmail"  # Remplace par ton adresse email
+          body: "The CI/CD pipeline failed."
